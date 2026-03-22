@@ -1,16 +1,22 @@
 ---
-- hosts: all
+- name: Cai dat Nginx tren ca Ubuntu va RHEL
+  hosts: all
+  # Bat quyen root de cai dat
+  become: yes
+  
   tasks:
-    - name: Update apt cache
+    - name: Cap nhat cache (Chi chay tren Ubuntu/Debian)
       apt:
         update_cache: yes
+      when: ansible_os_family == "Debian"
 
-    - name: Install Nginx package
-      apt:
+    - name: Cai dat goi Nginx
+      # Module 'package' se tu chon apt hoac dnf/yum tuy theo OS
+      package:
         name: nginx
         state: present
 
-    - name: Start and enable Nginx service
+    - name: Khoi chay va bat dich vu Nginx
       service:
         name: nginx
         state: started
