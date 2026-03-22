@@ -1,0 +1,7 @@
+---
+all:
+  hosts:
+    ubuntu-server-host:
+      ansible_host: 192.168.79.133
+    rhel9-host:
+      ansible_host: 192.168.79.129
