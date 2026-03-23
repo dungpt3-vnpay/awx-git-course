@@ -2,6 +2,8 @@
 - name: Open Firewall Ports using Shell Commands
   hosts: all
   gather_facts: yes
+  become: yes          # <--- THÊM DÒNG NÀY ĐỂ CHẠY QUYỀN ROOT
+  become_method: sudo  # <--- THÊM DÒNG NÀY ĐỂ DÙNG SUDO
   tasks:
     # Cho Ubuntu/Debian dùng UFW
     - name: Allow port using UFW command
