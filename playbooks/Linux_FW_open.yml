@@ -1,41 +1,22 @@
 ---
-- name: Open Firewall Ports on Linux Clients
+- name: Open Firewall Ports using Shell
   hosts: all
-  become: yes  # Bắt buộc phải có để chạy với quyền root
-  
+  become: yes
+  become_method: sudo
+  gather_facts: yes
   tasks:
-    - name: Parse YAML input from Survey
-      set_fact:
-        input_data: "{{ raw_yaml_input | from_yaml }}"
-      run_once: true
-
-    - name: Map variables from parsed YAML
-      set_fact:
-        ip_nguon: "{{ input_data.ip_nguon | default([]) }}"
-        ip_dich: "{{ input_data.ip_dich | default([]) }}"
-        ports: "{{ input_data.ports | default([]) }}"
-
-    # Dành cho RHEL/CentOS
-    - name: Configure firewalld (RHEL)
-      firewalld:
-        source: "{{ item.0 }}"
-        port: "{{ item.1 }}/tcp"
-        permanent: yes
-        state: enabled
-        immediate: yes
-      with_nested:
-        - "{{ ip_nguon }}"
-        - "{{ ports }}"
-      when: ansible_os_family == "RedHat"
-
-    # Dành cho Ubuntu (Sửa lại logic loop để tránh lỗi 'to_ip' nếu không cần thiết)
-    - name: Configure ufw (Ubuntu)
-      ufw:
-        rule: allow
-        from_ip: "{{ item.0 }}"
-        port: "{{ item.1 | string }}"
-        proto: tcp
+    - name: Allow port using UFW command
+      shell: "ufw allow from {{ item.0 }} to any port {{ item.1 }} proto tcp"
       with_nested:
         - "{{ ip_nguon }}"
         - "{{ ports }}"
       when: ansible_os_family == "Debian"
+
+    - name: Allow port using Firewalld command
+      shell: |
+        firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="{{ item.0 }}" port port="{{ item.1 }}" protocol="tcp" accept'
+        firewall-cmd --reload
+      with_nested:
+        - "{{ ip_nguon }}"
+        - "{{ ports }}"
+      when: ansible_os_family == "RedHat"
