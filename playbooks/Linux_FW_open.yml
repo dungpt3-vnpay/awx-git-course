@@ -1,28 +1,23 @@
 ---
-- name: Open Firewall Ports
+- name: Open Firewall Ports using Shell
   hosts: all
-  become: yes             # BẮT BUỘC CÓ DÒNG NÀY ĐỂ CHẠY ROOT
+  become: yes             # Ép dùng quyền sudo
+  become_method: sudo     # Phương thức sudo
   gather_facts: yes
   tasks:
-    # Cho máy Ubuntu (.133)
-    - name: Ensure ufw is configured
-      community.general.ufw:
-        rule: allow
-        from_ip: "{{ item.0 }}"
-        port: "{{ item.1 | string }}"
-        proto: tcp
+    # Cho máy Ubuntu/Debian (Sử dụng lệnh ufw trực tiếp)
+    - name: Allow port using UFW command
+      shell: "ufw allow from {{ item.0 }} to any port {{ item.1 }} proto tcp"
       with_nested:
         - "{{ ip_nguon }}"
         - "{{ ports }}"
       when: ansible_os_family == "Debian"
 
-    # Cho máy CentOS (.129)
-    - name: Ensure firewalld is configured
-      ansible.posix.firewalld:
-        rich_rule: 'rule family="ipv4" source address="{{ item.0 }}" port port="{{ item.1 }}" protocol="tcp" accept'
-        permanent: yes
-        state: enabled
-        immediate: yes
+    # Cho máy RHEL/CentOS (Sử dụng lệnh firewall-cmd trực tiếp)
+    - name: Allow port using Firewalld command
+      shell: |
+        firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="{{ item.0 }}" port port="{{ item.1 }}" protocol="tcp" accept'
+        firewall-cmd --reload
       with_nested:
         - "{{ ip_nguon }}"
         - "{{ ports }}"
