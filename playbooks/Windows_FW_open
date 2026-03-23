@@ -1,0 +1,19 @@
+---
+- name: Open Firewall Rules for Multiple Sources and Ports
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Create Firewall Rules
+      community.windows.win_firewall_rule:
+        name: "Allow_Traffic_From_{{ item.0 }}_to_{{ item.1 }}"
+        localport: "{{ item.1 }}"
+        remoteip: "{{ item.0 }}"
+        action: allow
+        direction: inbound
+        protocol: tcp
+        state: present
+        enabled: yes
+      # Sử dụng nested loop để mở cho mọi cặp (IP Nguồn) x (Port)
+      with_nested:
+        - "{{ ip_nguon }}"
+        - "{{ ports }}"
