@@ -14,16 +14,3 @@
         - "{{ ip_nguon }}"
         - "{{ ports }}"
       when: ansible_os_family == "RedHat"
-
-    - name: Ensure ufw is configured (Ubuntu/Debian)
-      ufw:
-        rule: allow
-        from_ip: "{{ item.0 }}"
-        to_ip: "{{ item.1 }}"
-        port: "{{ item.2 | string }}"
-        proto: tcp
-      with_nested:
-        - "{{ ip_nguon }}"
-        - "{{ ip_dich }}"
-        - "{{ ports }}"
-      when: ansible_os_family == "Debian"
