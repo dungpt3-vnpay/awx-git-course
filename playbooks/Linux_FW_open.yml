@@ -2,10 +2,9 @@
 - name: Open Firewall Ports using Shell Commands
   hosts: all
   gather_facts: yes
-  become: yes          # <--- THÊM DÒNG NÀY ĐỂ CHẠY QUYỀN ROOT
-  become_method: sudo  # <--- THÊM DÒNG NÀY ĐỂ DÙNG SUDO
+  become: yes          # <--- PHẢI CÓ DÒNG NÀY
+  become_method: sudo  # <--- PHẢI CÓ DÒNG NÀY
   tasks:
-    # Cho Ubuntu/Debian dùng UFW
     - name: Allow port using UFW command
       shell: "ufw allow from {{ item.0 }} to any port {{ item.1 }} proto tcp"
       with_nested:
@@ -13,7 +12,6 @@
         - "{{ ports }}"
       when: ansible_os_family == "Debian"
 
-    # Cho RHEL/CentOS dùng Firewalld
     - name: Allow port using Firewalld command
       shell: |
         firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="{{ item.0 }}" port port="{{ item.1 }}" protocol="tcp" accept'
