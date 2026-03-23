@@ -1,6 +1,5 @@
 ---
 collections:
-  - name: community.windows
-    version: 2.3.0 # Bạn có thể chọn bản mới nhất
+  - name: community.general
+  - name: ansible.posix
   - name: ansible.windows
-    version: 2.4.0
