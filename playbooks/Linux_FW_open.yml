@@ -1,12 +1,6 @@
----
-- name: Open Firewall Ports on Linux Clients
-  hosts: all
-  become: yes
-  tasks:
-    - name: Ensure firewalld is configured (RHEL/CentOS)
-      firewalld:
-        source: "{{ item.0 }}"
-        port: "{{ item.1 }}/tcp"
+- name: Ensure firewalld is configured with Rich Rules
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv4" source address="{{ item.0 }}" port port="{{ item.1 }}" protocol="tcp" accept'
         permanent: yes
         state: enabled
         immediate: yes
