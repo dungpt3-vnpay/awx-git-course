@@ -1,4 +1,10 @@
-- name: Ensure firewalld is configured with Rich Rules
+---
+- name: Open Firewall Ports on Linux
+  hosts: all
+  gather_facts: yes
+  tasks:
+    # Cấu hình cho RHEL/CentOS (Sử dụng Firewalld)
+    - name: Ensure firewalld is configured with Rich Rules
       ansible.posix.firewalld:
         rich_rule: 'rule family="ipv4" source address="{{ item.0 }}" port port="{{ item.1 }}" protocol="tcp" accept'
         permanent: yes
@@ -8,3 +14,15 @@
         - "{{ ip_nguon }}"
         - "{{ ports }}"
       when: ansible_os_family == "RedHat"
+
+    # Cấu hình cho Ubuntu/Debian (Sử dụng UFW)
+    - name: Ensure ufw is configured
+      community.general.ufw:
+        rule: allow
+        from_ip: "{{ item.0 }}"
+        port: "{{ item.1 | string }}"
+        proto: tcp
+      with_nested:
+        - "{{ ip_nguon }}"
+        - "{{ ports }}"
+      when: ansible_os_family == "Debian"
