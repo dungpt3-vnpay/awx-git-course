@@ -1,0 +1,14 @@
+---
+- name: Test kết nối Windows qua SSH
+  hosts: all
+  gather_facts: yes # Để kiểm tra xem có lấy được thông tin máy chủ không
+
+  tasks:
+    - name: Kiểm tra thư mục Temp
+      win_stat:
+        path: C:\Windows\Temp
+      register: temp_status
+
+    - name: Hiển thị kết quả
+      debug:
+        msg: "Kết nối thành công tới {{ inventory_hostname }}"
