@@ -1,0 +1,55 @@
+---
+- name: Triển khai Wazuh Agent linh động từ IIS nội bộ
+  hosts: all
+  gather_facts: false
+  vars:
+    # Các thông số mặc định (Có thể ghi đè từ Survey AWX)
+    web_server_base_url: "http://192.168.79.128/software"
+    installer_file: "wazuh-agent-4.14.3-1.msi"
+    
+    # Thông số cấu hình Wazuh
+    wazuh_manager_ip: "10.30.4.252"
+    wazuh_reg_password: "n2GiCFwDdPaBlzctoJYh"
+    
+    # Thư mục tạm trên Client
+    local_script_dir: "C:\\Scripts"
+    local_installer_path: "{{ local_script_dir }}\\{{ installer_file }}"
+
+  tasks:
+    - name: 1. Đảm bảo thư mục C:\Scripts tồn tại
+      ansible.windows.win_file:
+        path: "{{ local_script_dir }}"
+        state: directory
+
+    - name: 2. Tải bộ cài Wazuh từ Web Server
+      ansible.windows.win_get_url:
+        url: "{{ web_server_base_url }}/{{ installer_file }}"
+        dest: "{{ local_installer_path }}"
+        force: yes
+        timeout: 120
+
+    - name: 3. Thực hiện cài đặt Wazuh Agent với tham số cấu hình
+      ansible.windows.win_package:
+        path: "{{ local_installer_path }}"
+        # Chú ý: Cấu trúc arguments của MSI cho Wazuh Agent
+        arguments: 
+          - /q
+          - WAZUH_MANAGER='{{ wazuh_manager_ip }}'
+          - WAZUH_REGISTRATION_PASSWORD='{{ wazuh_reg_password }}'
+        state: present
+      register: wazuh_install
+
+    - name: 4. Đảm bảo dịch vụ Wazuh đã được khởi chạy
+      ansible.windows.win_service:
+        name: Wazuh
+        start_mode: auto
+        state: started
+
+    - name: 5. Dọn dẹp file cài đặt
+      ansible.windows.win_file:
+        path: "{{ local_installer_path }}"
+        state: absent
+
+    - name: Thông báo kết quả
+      ansible.builtin.debug:
+        msg: "Wazuh Agent đã được cài đặt và kết nối tới {{ wazuh_manager_ip }}"
