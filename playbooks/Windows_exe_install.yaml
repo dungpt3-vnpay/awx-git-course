@@ -1,0 +1,51 @@
+---
+- name: Triển khai cài đặt phần mềm linh động (EXE/MSI) từ IIS
+  hosts: all
+  gather_facts: false
+  vars:
+    # Bạn chỉ cần thay đổi 2 dòng này hoặc truyền từ AWX Extra Vars
+    web_server_base_url: "http://192.168.79.128/software"
+    installer_file: "setup.msi"  # Có thể đổi thành "dcd.exe"
+    
+    # Đường dẫn nội bộ trên máy Client
+    local_script_dir: "C:\\Scripts"
+    local_installer_path: "{{ local_script_dir }}\\{{ installer_file }}"
+
+  tasks:
+    - name: 1. Đảm bảo thư mục C:\Scripts tồn tại
+      ansible.windows.win_file:
+        path: "{{ local_script_dir }}"
+        state: directory
+
+    - name: 2. Cấp quyền cho thư mục Scripts
+      ansible.windows.win_acl:
+        path: "{{ local_script_dir }}"
+        user: "Builtin\\Administrators"
+        rights: FullControl
+        type: allow
+        state: present
+
+    - name: 3. Tải file cài đặt từ Web Server (Linh động tên file)
+      ansible.windows.win_get_url:
+        url: "{{ web_server_base_url }}/{{ installer_file }}"
+        dest: "{{ local_installer_path }}"
+        force: yes
+        timeout: 60
+
+    - name: 4. Thực hiện cài đặt (Tự động nhận diện EXE/MSI)
+      ansible.windows.win_package:
+        path: "{{ local_installer_path }}"
+        # Logic chọn tham số cài đặt im lặng:
+        # Nếu là MSI dùng /qn, nếu là EXE dùng /S (hoặc /quiet tùy bộ cài)
+        arguments: "{{ '/qn' if installer_file.endswith('.msi') else '/S' }}"
+        state: present
+      register: install_result
+
+    - name: 5. Thông báo kết quả
+      ansible.builtin.debug:
+        msg: "Đã xử lý cài đặt file {{ installer_file }}. Trạng thái: {{ install_result.msg | default('Success') }}"
+
+    - name: 6. Dọn dẹp sau khi cài
+      ansible.windows.win_file:
+        path: "{{ local_installer_path }}"
+        state: absent
