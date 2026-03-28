@@ -1,0 +1,60 @@
+---
+- name: Cài đặt và cấu hình Wazuh Agent linh động
+  hosts: all
+  gather_facts: false
+  vars:
+    # Các biến này sẽ nhận từ Survey của AWX
+    web_server_base_url: "http://192.168.79.128/software"
+    installer_file: "wazuh-agent-4.14.3-1.msi"
+    manager_ip: ""      # Sẽ nhập khi chạy
+    reg_password: ""    # Sẽ nhập khi chạy
+    
+    local_script_dir: "C:\\Scripts"
+    local_installer_path: "{{ local_script_dir }}\\{{ installer_file }}"
+
+  tasks:
+    - name: 1. Kiểm tra kết nối tới các Port của Wazuh Manager
+      # Task này chỉ kiểm tra và thông báo, không làm dừng playbook (ignore_errors: yes)
+      ansible.windows.win_wait_for:
+        host: "{{ manager_ip }}"
+        port: "{{ item.port }}"
+        state: started
+        timeout: 5
+      loop:
+        - { port: 1514, proto: 'TCP/UDP' }
+        - { port: 1515, proto: 'TCP' }
+      register: port_check
+      ignore_errors: yes
+
+    - name: 2. Thông báo trạng thái Port
+      ansible.builtin.debug:
+        msg: "Port {{ item.item.port }} ({{ item.item.proto }}): {{ 'MỞ (OPEN)' if item.state == 'started' else 'ĐÓNG (CLOSED)' }}"
+      loop: "{{ port_check.results }}"
+
+    - name: 3. Tạo thư mục C:\Scripts
+      ansible.windows.win_file:
+        path: "{{ local_script_dir }}"
+        state: directory
+
+    - name: 4. Tải bộ cài Wazuh từ Web Server nội bộ
+      ansible.windows.win_get_url:
+        url: "{{ web_server_base_url }}/{{ installer_file }}"
+        dest: "{{ local_installer_path }}"
+        force: yes
+
+    - name: 5. Cài đặt Wazuh Agent với tham số động
+      # Chú ý: Cấu trúc WAZUH_REGISTRATION_PASSWORD={{ reg_password }} không dùng nháy bao quanh biến 
+      # để tránh việc MSI nhận nhầm ký tự nháy vào file authd.pass
+      ansible.windows.win_package:
+        path: "{{ local_installer_path }}"
+        arguments: >
+          /q
+          WAZUH_MANAGER="{{ manager_ip }}"
+          WAZUH_REGISTRATION_PASSWORD={{ reg_password }}
+        state: present
+      register: install_wazuh_result
+
+    - name: 6. Kiểm tra dịch vụ Wazuh sau khi cài
+      ansible.windows.win_service:
+        name: Wazuh
+        state: started
