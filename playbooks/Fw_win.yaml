@@ -2,7 +2,10 @@
 - name: Mở Firewall mềm trên Windows linh động
   hosts: all
   gather_facts: false
-  
+  # Thêm dòng này để chỉ định rõ collection sử dụng
+  collections:
+    - community.windows
+    - ansible.windows
   # Các biến này sẽ được nhận từ Survey của AWX
   vars:
     fw_rule_name: "Allow_Custom_Traffic"
