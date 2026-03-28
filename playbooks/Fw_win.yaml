@@ -1,0 +1,29 @@
+---
+- name: Mở Firewall mềm trên Windows linh động
+  hosts: all
+  gather_facts: false
+  
+  # Các biến này sẽ được nhận từ Survey của AWX
+  vars:
+    fw_rule_name: "Allow_Custom_Traffic"
+    fw_port: "8080"          # Giá trị mặc định nếu không nhập
+    fw_source_ip: "Any"     # Giá trị mặc định
+    fw_action: "allow"
+    fw_protocol: "TCP"
+
+  tasks:
+    - name: "Thực hiện mở Port {{ fw_port }} cho IP {{ fw_source_ip }}"
+      community.windows.win_firewall_rule:
+        name: "{{ fw_rule_name }}_{{ fw_port }}"
+        localport: "{{ fw_port }}"
+        action: "{{ fw_action }}"
+        direction: in
+        protocol: "{{ fw_protocol }}"
+        remoteip: "{{ fw_source_ip }}"
+        state: present
+        enabled: yes
+      register: fw_result
+
+    - name: Hiển thị trạng thái sau khi thực thi
+      ansible.builtin.debug:
+        msg: "Đã tạo rule {{ fw_rule_name }} mở port {{ fw_port }} từ nguồn {{ fw_source_ip }}"
