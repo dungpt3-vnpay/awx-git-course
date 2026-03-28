@@ -1,44 +1,45 @@
 ---
-- name: Cài đặt Wazuh Agent và Check Port chuẩn
+- name: Cài đặt Wazuh Agent và Check Port
   hosts: all
   gather_facts: false
   vars:
+    # Các biến này phải khớp chính xác với Answer Variable trong Survey AWX
     web_server_base_url: "http://192.168.79.128/software"
     installer_file: "wazuh-agent-4.14.3-1.msi"
-    manager_ip: ""      # Nhập từ Survey
-    reg_password: ""    # Nhập từ Survey
+    manager_ip: "{{ manager_ip | default('') }}"
+    reg_password: "{{ reg_password | default('') }}"
     
     local_script_dir: "C:\\Scripts"
     local_installer_path: "{{ local_script_dir }}\\{{ installer_file }}"
 
   tasks:
-    - name: 1. Kiểm tra kết nối tới Wazuh Manager (1514, 1515)
-      # Sử dụng PowerShell để test kết nối, không làm dừng Playbook nếu fail
+    - name: 1. Kiểm tra kết nối tới Manager Port (Chỉ thông báo)
+      # Sử dụng win_shell để Test-NetConnection không làm dừng Playbook
       ansible.windows.win_shell: |
-        $result = Test-NetConnection -ComputerName {{ manager_ip }} -Port {{ item }} -InformationLevel Quiet
+        $result = Test-NetConnection -ComputerName "{{ manager_ip }}" -Port {{ item }} -InformationLevel Quiet
         return $result
       loop: [1514, 1515]
       register: port_results
-      changed_when: false
+      # Luôn cho qua kể cả khi lệnh check bị lỗi (ví dụ IP trống hoặc Port đóng)
+      failed_when: false 
 
-    - name: 2. Thông báo trạng thái Port rõ ràng
+    - name: 2. Hiển thị kết quả Check Port
       ansible.builtin.debug:
-        msg: "Port {{ item.item }}: {{ 'KẾT NỐI THÀNH CÔNG (OPEN)' if item.stdout_lines[0] == 'True' else 'KẾT NỐI THẤT BẠI (CLOSED)' }}"
+        msg: "Port {{ item.item }}: {{ 'MỞ (OPEN)' if item.stdout_lines[0] == 'True' else 'ĐÓNG (CLOSED) HOẶC SAI IP' }}"
       loop: "{{ port_results.results }}"
 
-    - name: 3. Tạo thư mục C:\Scripts
+    - name: 3. Tạo thư mục và tải bộ cài (Vẫn thực hiện tiếp)
       ansible.windows.win_file:
         path: "{{ local_script_dir }}"
         state: directory
 
-    - name: 4. Tải bộ cài Wazuh
+    - name: 4. Tải bộ cài từ Web Server
       ansible.windows.win_get_url:
         url: "{{ web_server_base_url }}/{{ installer_file }}"
         dest: "{{ local_installer_path }}"
         force: yes
 
     - name: 5. Cài đặt Wazuh Agent
-      # Chú ý phần mật khẩu không bao gồm dấu nháy để tránh lỗi authd.pass
       ansible.windows.win_package:
         path: "{{ local_installer_path }}"
         arguments: >
@@ -46,8 +47,3 @@
           WAZUH_MANAGER="{{ manager_ip }}"
           WAZUH_REGISTRATION_PASSWORD={{ reg_password }}
         state: present
-
-    - name: 6. Khởi động dịch vụ Wazuh
-      ansible.windows.win_service:
-        name: Wazuh
-        state: started
