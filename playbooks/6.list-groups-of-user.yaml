@@ -1,0 +1,47 @@
+---
+- name: Liệt kê các Group mà một User thuộc về
+  hosts: all
+  gather_facts: false
+  collections:
+    - microsoft.ad
+    - ansible.windows
+
+  vars:
+    # Biến này nhận từ Survey trên AWX (Ví dụ: dungpt)
+    target_user: "user_test_01"
+
+  tasks:
+    - name: 1. Truy vấn thông tin User và các Group tham gia
+      microsoft.ad.object_info:
+        identity: "{{ target_user | trim }}"
+        properties:
+          - memberOf
+          - DisplayName
+      register: user_info
+
+    - name: 2. Kiểm tra nếu User không tồn tại
+      ansible.builtin.fail:
+        msg: "Lỗi: Không tìm thấy User '{{ target_user }}' trong hệ thống."
+      when: user_info.objects | length == 0
+
+    - name: 3. Trích xuất danh sách Group
+      ansible.builtin.set_fact:
+        group_list: "{{ user_info.objects[0].memberOf | default([]) }}"
+
+    - name: 4. Hiển thị thông báo nếu User không thuộc Group nào
+      ansible.builtin.debug:
+        msg: "User '{{ target_user }}' hiện không thuộc bất kỳ Group nào."
+      when: group_list | length == 0
+
+    - name: 5. Liệt kê chi tiết các Group tham gia
+      ansible.builtin.debug:
+        msg: "Group: {{ item }}"
+      loop: "{{ group_list }}"
+      when: group_list | length > 0
+      loop_control:
+        label: "Group DN"
+
+    - name: 6. Thống kê tổng số lượng
+      ansible.builtin.debug:
+        msg: "Tổng cộng User '{{ target_user }}' đang tham gia {{ group_list | length }} nhóm."
+      when: group_list | length > 0

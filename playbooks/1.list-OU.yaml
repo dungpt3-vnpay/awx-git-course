@@ -1,0 +1,35 @@
+---
+- name: Liệt kê cấu trúc phân cấp OU trên Active Directory
+  hosts: all
+  gather_facts: false
+  collections:
+    - microsoft.ad
+    - ansible.windows
+
+  tasks:
+    - name: 1. Lấy danh sách tất cả OU từ AD
+      microsoft.ad.object_info:
+        filter: "objectClass -eq 'organizationalUnit'"
+        properties:
+          - DistinguishedName
+          - Name
+      register: ou_results
+
+    - name: 2. Hiển thị danh sách OU và OU Cha tương ứng
+      ansible.builtin.debug:
+        msg: >-
+          OU: {{ item.Name }} 
+          | DN: {{ item.DistinguishedName }}
+          | OU Cha: {{ (item.DistinguishedName.split(',', 1)[1]) if ',' in item.DistinguishedName else 'Root' }}
+      loop: "{{ ou_results.objects }}"
+      loop_control:
+        label: "{{ item.Name }}"
+
+    - name: 3. Tạo báo cáo phân cấp (Dạng đơn giản)
+      ansible.builtin.set_fact:
+        ou_hierarchy: "{{ ou_hierarchy | default([]) + [item.Name + ' (thuộc: ' + (item.DistinguishedName.split(',', 1)[1]) + ')'] }}"
+      loop: "{{ ou_results.objects }}"
+
+    - name: 4. In báo cáo tổng hợp
+      ansible.builtin.debug:
+        var: ou_hierarchy

@@ -1,0 +1,31 @@
+---
+- name: Nội soi thư mục code TRÊN AWX (Linux Only)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Ép buộc dùng đúng trình thực thi của Linux
+    ansible_shell_type: sh
+    ansible_python_interpreter: /usr/bin/python3
+  tasks:
+    - name: 1. Liet ke thu muc bang Python (De khong bi phu thuoc vao Shell)
+      python_script:
+        script: |
+          import os
+          for root, dirs, files in os.walk('/runner/project/'):
+              for file in files:
+                  print(os.path.join(root, file))
+      register: py_output
+
+    - name: 2. Ket qua soi thu muc
+      debug:
+        msg: "{{ py_output.stdout_lines }}"
+
+    - name: 3. Kiem tra file Manifest neu co
+      shell: "cat /runner/project/collections/ansible_collections/microsoft/ad/MANIFEST.json"
+      register: manifest_out
+      ignore_errors: true
+
+    - name: 4. Noi dung Manifest
+      debug:
+        var: manifest_out.stdout

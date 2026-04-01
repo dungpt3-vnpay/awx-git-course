@@ -1,0 +1,38 @@
+---
+- name: Quản lý User trên Windows (Thường & Admin)
+  hosts: all
+  gather_facts: false
+  vars:
+    # Các biến này sẽ nhận từ Survey của AWX
+    win_username: "user_test"
+    win_password: "DefaultPassword123!"
+    is_admin: false  # Mặc định là user thường
+
+  tasks:
+    - name: 1. Tạo User trên máy Windows
+      ansible.windows.win_user:
+        name: "{{ win_username }}"
+        password: "{{ win_password }}"
+        state: present
+        groups:
+          - Users  # Luôn nằm trong nhóm người dùng thường
+        password_never_expires: yes
+        update_password: always
+
+    - name: 2. Cấp quyền Admin (Nếu được lựa chọn)
+      ansible.windows.win_group_membership:
+        name: Administrators
+        members:
+          - "{{ win_username }}"
+        state: present
+      # Task này chỉ chạy nếu biến is_admin là true
+      when: is_admin | bool
+
+    - name: 3. Đảm bảo Gỡ quyền Admin (Nếu chọn là user thường)
+      ansible.windows.win_group_membership:
+        name: Administrators
+        members:
+          - "{{ win_username }}"
+        state: absent
+      # Task này chạy nếu chọn là user thường, để tránh việc user cũ từng là admin
+      when: not (is_admin | bool)

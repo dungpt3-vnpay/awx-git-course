@@ -1,0 +1,30 @@
+---
+- name: Quản lý User trên Active Directory (AD)
+  hosts: all
+  gather_facts: false
+  collections:
+    - microsoft.ad        # Bộ quản lý AD
+    - community.windows   # Bộ quản lý Firewall/IIS
+    - ansible.windows     # Bộ core Windows
+
+  tasks:
+    - name: 1. Kiểm tra User đã tồn tại
+      microsoft.ad.object_info:  # Tên mới của win_ad_object_info
+        identity: "{{ ad_username }}"
+      register: user_info
+
+    - name: 3. Tạo mới User
+      microsoft.ad.user:         # Tên mới của win_ad_user
+        name: "{{ ad_username }}"
+        password: "{{ ad_password }}"
+        path: "{{ ad_ou_path }}"
+        state: present
+      when: not (user_info.exists | default(false))
+
+    - name: 5. Thêm vào Group
+      microsoft.ad.membership:   # Tên mới của win_ad_group_membership
+        name: "{{ item }}"
+        members:
+          - "{{ ad_username }}"
+        state: present
+      loop: "{{ ad_groups }}"

@@ -1,6 +1,6 @@
 ---
 collections:
-  #- name: community.general
-  #- name: ansible.posix
-  - name: community.windows
-  - name: ansible.windows
+  - name: "./collections/microsoft-ad-1.10.0.tar.gz"
+    type: file
+  - name: "./collections/ansible-windows-3.5.0.tar.gz"
+    type: file

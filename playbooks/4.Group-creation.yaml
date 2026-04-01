@@ -1,0 +1,40 @@
+---
+- name: Tạo Group mới vào OU chỉ định
+  hosts: all
+  gather_facts: false
+  collections:
+    - microsoft.ad
+    - ansible.windows
+
+  vars:
+    # Các biến này có thể nhập từ Survey trên AWX
+    new_group_name: "GL_KETOAN_READ"
+    target_ou_dn: "OU=PhongBan,DC=dungpt,DC=local"
+    group_scope: "global"      # Có thể là: domainlocal, global, universal
+    group_category: "security" # Có thể là: security, distribution
+
+  tasks:
+    - name: 1. Kiểm tra OU mục tiêu có tồn tại không
+      microsoft.ad.object_info:
+        identity: "{{ target_ou_dn }}"
+      register: ou_info
+
+    - name: 2. Dừng lại nếu không thấy OU
+      ansible.builtin.fail:
+        msg: "Lỗi: OU '{{ target_ou_dn }}' không tồn tại. Vui lòng tạo OU trước."
+      when: ou_info.objects | length == 0
+
+    - name: 3. Thực hiện tạo Group trong OU
+      microsoft.ad.group:
+        name: "{{ new_group_name }}"
+        path: "{{ target_ou_dn }}"
+        state: present
+        scope: "{{ group_scope }}"
+        category: "{{ group_category }}"
+        description: "Group được tạo tự động từ AWX"
+      register: group_creation
+
+    - name: 4. Hiển thị thông báo kết quả
+      ansible.builtin.debug:
+        msg: "Đã tạo thành công Group {{ new_group_name }} tại {{ target_ou_dn }}"
+      when: group_creation.changed

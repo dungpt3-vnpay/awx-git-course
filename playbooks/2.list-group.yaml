@@ -1,0 +1,35 @@
+---
+- name: Liệt kê tất cả các Group trên Active Directory
+  hosts: all
+  gather_facts: false
+  collections:
+    - microsoft.ad
+    - ansible.windows
+
+  tasks:
+    - name: 1. Truy vấn danh sách Group từ AD
+      microsoft.ad.object_info:
+        filter: "objectClass -eq 'group'"
+        properties:
+          - Name
+          - groupCategory
+          - groupScope
+          - DistinguishedName
+          - member
+      register: ad_groups_results
+
+    - name: 2. Hiển thị thông tin chi tiết từng Group
+      ansible.builtin.debug:
+        msg: >-
+          Tên Nhóm: {{ item.Name }}
+          | Loại: {{ item.groupCategory }}
+          | Phạm vi: {{ item.groupScope }}
+          | Số lượng thành viên: {{ item.member | default([]) | length }}
+          | Đường dẫn: {{ item.DistinguishedName }}
+      loop: "{{ ad_groups_results.objects }}"
+      loop_control:
+        label: "{{ item.Name }}"
+
+    - name: 3. Thống kê tổng số lượng Group tìm thấy
+      ansible.builtin.debug:
+        msg: "Tổng cộng tìm thấy {{ ad_groups_results.objects | length }} nhóm trong hệ thống AD."

@@ -1,0 +1,53 @@
+---
+- name: Thêm người dùng vào nhóm AD với kiểm tra tồn tại
+  hosts: all
+  gather_facts: false
+  collections:
+    - microsoft.ad
+    - ansible.windows
+
+  vars:
+    # Các biến này sẽ nhận từ Survey trên AWX (nhập text thuần, không dấu ngoặc kép)
+    target_user: "dungpt_test"        
+    target_group: "GL_KETOAN_ADMIN"   
+
+  tasks:
+    - name: 1. Kiểm tra sự tồn tại của Group
+      microsoft.ad.object_info:
+        # BỎ 'filter', chỉ dùng 'identity'
+        identity: "{{ target_group | trim }}"
+      register: group_search
+      ignore_errors: true
+
+    - name: 2. Cảnh báo và báo lỗi nếu Group không tồn tại
+      ansible.builtin.fail:
+        msg: >
+          [CANH BAO]: Khong tim thay Group '{{ target_group }}' trong Active Directory. 
+          Vui long kiem tra lai ten Group hoac tạo Group trước.
+      when: group_search.objects | length == 0
+
+    - name: 3. Kiểm tra sự tồn tại của User
+      microsoft.ad.object_info:
+        # BỎ 'filter', chỉ dùng 'identity'
+        identity: "{{ target_user | trim }}"
+      register: user_search
+      ignore_errors: true
+
+    - name: 4. Cảnh báo và báo lỗi nếu User không tồn tại
+      ansible.builtin.fail:
+        msg: "Loi: Khong tim thay User '{{ target_user }}'. Khong the thuc hien add vao group."
+      when: user_search.objects | length == 0
+
+    - name: 5. Thêm User vào Group
+      microsoft.ad.membership:
+        name: "{{ target_group | trim }}"
+        members:
+          - "{{ target_user | trim }}"
+        state: present
+      register: add_result
+
+    - name: 6. Thông báo kết quả
+      ansible.builtin.debug:
+        msg: >
+          {{ "User '" + target_user + "' DA DUOC THEM vao Group '" + target_group + "' thành công." if add_result.changed 
+          else "User '" + target_user + "' DA O TRONG Group '" + target_group + "' từ trước (không có thay đổi)." }}
