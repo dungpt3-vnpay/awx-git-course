@@ -8,8 +8,8 @@
     installer_file: "wazuh-agent-4.14.3-1.msi"
     
     # Thông số cấu hình Wazuh
-    wazuh_manager_ip: "10.30.4.252"
-    wazuh_reg_password: "n2GiCFwDdPaBlzctoJYh"
+    wazuh_manager_ip: "xxx.xxx.xxx.xxx"
+    wazuh_reg_password: "xxxxxxxxxxxxxxxxxxxxx"
     
     # Thư mục tạm trên Client
     local_script_dir: "C:\\Scripts"
