@@ -7,76 +7,85 @@
     - ansible.windows
 
   vars:
-    # Các biến này sẽ nhận từ Survey trên AWX
-    new_username: "user_test_01"
-    new_password: "Password123456!"
-    target_ou_dn: "OU=System,OU=HOMEUSERS,DC=test,DC=lab"
+    # ── Nhận từ Survey AWX ──────────────────────────────────
+    new_username:  "dungpt"
+    new_password:  "Password123456!"
+    target_ou_dn:  "OU=System,OU=HOMEUSERS,DC=test,DC=lab"
     user_firstname: "Dung"
-    user_lastname: "Pham Tien"
+    user_lastname:  "Pham Tien"
+    # ── Tự động ghép, không cần nhập thêm ───────────────────
+    full_display_name: "{{ user_firstname | trim }} {{ user_lastname | trim }}"
 
   tasks:
-    # ─────────────────────────────────────────
-    # DEBUG: Xác định user đang thực thi
-    # ─────────────────────────────────────────
-    - name: 0. Kiểm tra user đang thực thi playbook
-      ansible.windows.win_shell: |
-        Write-Output "whoami      : $(whoami)"
-        Write-Output "displayname : $((Get-ADUser -Identity $env:USERNAME -Properties DisplayName).DisplayName)"
-      register: runner_info
-      ignore_errors: true   # phòng trường hợp AD module chưa sẵn sàng
-
-    - name: 0. Hiển thị thông tin user thực thi
-      ansible.builtin.debug:
-        msg: "{{ runner_info.stdout_lines }}"
-
-    # ─────────────────────────────────────────
-    # MAIN TASKS
-    # ─────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────
+    # BƯỚC 1 – Kiểm tra OU
+    # ─────────────────────────────────────────────────────────
     - name: 1. Kiểm tra OU mục tiêu có tồn tại không
       microsoft.ad.object_info:
-        identity: "{{ target_ou_dn | replace('\"', '') | trim }}"
+        identity: "{{ target_ou_dn | trim }}"
       register: ou_info
 
-    - name: 2. Dừng lại nếu OU không tồn tại
+    - name: 2. Dừng nếu OU không tồn tại
       ansible.builtin.fail:
-        msg: "Lỗi: Không tìm thấy OU tại đường dẫn {{ target_ou_dn }}."
+        msg: "Lỗi: Không tìm thấy OU '{{ target_ou_dn }}'."
       when: ou_info.objects | length == 0
 
+    # ─────────────────────────────────────────────────────────
+    # BƯỚC 2 – Kiểm tra User
+    # ─────────────────────────────────────────────────────────
     - name: 3. Kiểm tra User đã tồn tại chưa
       microsoft.ad.object_info:
         identity: "{{ new_username }}"
       register: user_check
-      # Nếu user chưa tồn tại module sẽ trả về objects = []
-      # không raise lỗi nên không cần ignore_errors
+      ignore_errors: true   # trả về objects=[] nếu chưa có, không lỗi
 
-    - name: 4. Thông báo trạng thái User
+    - name: 4. Thông báo trạng thái
       ansible.builtin.debug:
         msg: >-
-          {{ "User '" + new_username + "' đã tồn tại. Sẽ thực hiện cập nhật Password."
-          if user_check.objects | length > 0
-          else "User '" + new_username + "' chưa có. Sẽ thực hiện tạo mới." }}
+          {{ "User '" + new_username + "' đã tồn tại → sẽ cập nhật Password."
+             if (user_check.objects | default([]) | length) > 0
+             else "User '" + new_username + "' chưa có → sẽ tạo mới." }}
 
-    - name: 5. Thực hiện Tạo mới hoặc Cập nhật User
+    # ─────────────────────────────────────────────────────────
+    # BƯỚC 3 – Tạo mới / Cập nhật User
+    # Mấu chốt:
+    #   name            = display name hiển thị trong ADUC (tức CN)
+    #   sam_account_name = logon name (dungpt)
+    #   display_name    = tên hiện ở cột "Name" / khi Rename trong ADUC
+    # ─────────────────────────────────────────────────────────
+    - name: 5. Tạo mới hoặc cập nhật User
       microsoft.ad.user:
-        name:         "{{ new_username }}"
-        firstname:    "{{ user_firstname | trim }}"
-        surname:      "{{ user_lastname | trim }}"
-        # Display Name hiển thị đúng "Dung Pham Tien" (firstname + lastname)
-        display_name: "{{ user_firstname | trim }} {{ user_lastname | trim }}"
+        # CN trong AD – đặt bằng Display Name luôn để ADUC hiện đúng ngay
+        name:             "{{ full_display_name }}"
+        # Logon name (pre-Windows 2000) – giữ đúng username ngắn
         sam_account_name: "{{ new_username }}"
-        password:     "{{ new_password }}"
-        path:         "{{ target_ou_dn | replace('\"', '') | trim }}"
-        state:        present
-        enabled:      true
+        # UPN – đặt tường minh để tránh AD tự ghép sai
+        upn:              "{{ new_username }}@{{ ansible_domain | default('test.lab') }}"
+        firstname:        "{{ user_firstname | trim }}"
+        surname:          "{{ user_lastname | trim }}"
+        # Display Name = họ tên đầy đủ, hiện ở mọi nơi trong AD/Exchange/Teams
+        display_name:     "{{ full_display_name }}"
+        password:         "{{ new_password }}"
+        path:             "{{ target_ou_dn | trim }}"
+        state:            present
+        enabled:          true
         password_never_expires: false
-        update_password: always
+        update_password:  always
       register: user_result
 
-    - name: 6. Xác nhận kết quả cuối cùng
+    # ─────────────────────────────────────────────────────────
+    # BƯỚC 4 – Kết quả
+    # ─────────────────────────────────────────────────────────
+    - name: 6. Kết quả thực thi
       ansible.builtin.debug:
-        msg: >-
-          {{ 'KẾT QUẢ: Đã tạo mới User thành công.' if user_check.objects | length == 0
-          else 'KẾT QUẢ: Đã cập nhật mật khẩu cho User thành công.' }}
-          | Display Name: {{ user_firstname | trim }} {{ user_lastname | trim }}
-          | OU: {{ target_ou_dn }}
-      when: user_result.changed
+        msg:
+          - "──────────────────────────────────────────"
+          - "{{ 'Đã TẠO MỚI user thành công.'
+               if (user_check.objects | default([]) | length) == 0
+               else 'Đã CẬP NHẬT mật khẩu thành công.' }}"
+          - "Display Name : {{ full_display_name }}"
+          - "Logon Name   : {{ new_username }}"
+          - "OU           : {{ target_ou_dn }}"
+          - "Changed      : {{ user_result.changed }}"
+          - "──────────────────────────────────────────"
+      when: user_result is defined
